@@ -1,0 +1,784 @@
+
+title: "Identification of differential expression genes"
+output: html_notebook
+---
+
+```{r}
+install.packages("BiocManager")
+install.packages("forcats")
+install.packages("stringr")
+install.packages("ggplot2")
+install.packages("ggrepel")
+install.packages("readr")
+install.packages("tidyr")
+install.packages("survminer")
+install.packages("AnnoProbe")
+
+BiocManager::install("GEOquery")
+BiocManager::install("limma")
+BiocManager::install("pheatmap")
+BiocManager::install("org.Hs.eg.db")
+BiocManager::install("biomaRt") # local install package works.
+remotes::install_github("jmzeng1314/GEOmirror")
+rm(list = ls())
+getwd()
+```
+
+```{r}
+rm(list = ls())
+library(GEOquery)
+library(limma)
+library(umap)
+library(dplyr)
+library(tibble)
+library(GEOmirror)
+library(AnnoProbe)
+library(ggpubr)
+library(biomaRt)
+getOption('timeout')
+options(timeout=100000)
+source("functions.R")
+
+getwd()
+setwd("To/PATH/osteoporosis_sarcopenia_analysis")
+```
+
+## 1. Import the data
+```{r}
+geoID <- "GSEXXX" # replace the geoID with yours
+disease_name <- "Osteoporosis"
+
+geoID <- "GSEYYY"
+disease_name <- "Sarcopenia"
+
+paste0(disease_name,": ", geoID)
+
+gset  <- getGEO(geoID, GSEMatrix =TRUE, getGPL=FALSE, destdir="./data/")
+# There is an alternative/quick option below if you want to download the data from China
+gset  <- geoChina(geoID, destdir="./data/") 
+
+data     <- gset[[1]]
+exprSet  <- exprs(data)
+metadata <- pData(data)
+```
+
+```{r}
+# Define the directory path
+getwd()
+projecr_path <- getwd()
+output_dir   <- paste0(projecr_path, "/output_degs/",disease_name,"_",geoID,"/")
+output_dir
+# Create the directory if it doesn't exist
+if (!file.exists(output_dir)) {
+  dir.create(output_dir, recursive = TRUE)
+}
+```
+
+
+```{r}
+source("functions.R")
+probe2symbol_df <- annotate_gene(data)
+probe2symbol_df <- annotate_gene_from_db(data) # this is the alternative option
+
+## Show the number of probes
+length(unique(probe2symbol_df$probe_id))
+
+## Show the number of unique probes
+length(unique(probe2symbol_df$symbol))
+```
+
+## 2. Probe redup
+```{r}
+ex <- exprSet
+qx <- as.numeric(quantile(ex, c(0., 0.25, 0.5, 0.75, 0.99, 1.0), na.rm=T))
+LogC <- (qx[5] > 100) ||
+  (qx[6]-qx[1] > 50 && qx[2] > 0) ||
+  (qx[2] > 0 && qx[2] < 1 && qx[4] > 1 && qx[4] < 2)
+LogC
+
+if (LogC) {
+  exprSet <- log2(ex+1)
+  print("log2 transform finished")
+}else{
+  print("log2 transform do not needed")
+}
+```
+
+
+```{r}
+# Normalization
+output_file <- paste0(output_dir, geoID, "_norm_before.pdf")
+output_file
+pdf(output_file) 
+boxplot(exprSet,outline=FALSE, notch=T, las=2)
+dev.off()
+
+exprSet <- normalizeBetweenArrays(exprSet)
+exprSet <- as.data.frame(exprSet)
+
+output_file <- paste0(output_dir, geoID, "_norm_after.pdf")
+output_file
+pdf(output_file) 
+boxplot(exprSet,outline=FALSE, notch=T, las=2)
+dev.off()
+```
+
+
+```{r}
+# Check and get rid of missing values
+if(any(is.na(exprSet))){
+  length(which(is.na(exprSet)))
+  nan_rows <- which(apply(exprSet, 1, function(row) any(is.na(row))))
+  length(nan_rows)
+  exprSet <- exprSet[-nan_rows, ]
+  any(is.na(exprSet))
+}
+paste("GEOID:",geoID, "Platform:",gpl)
+```
+
+
+```{r}
+#install.packages("dplyr", dependencies = TRUE) # Try this if your R/Rstudio doesn't work when loading the following libraries.
+library(dplyr)
+library(tibble)
+
+exprSet <- exprSet %>% 
+            rownames_to_column("probe_id") %>% 
+            inner_join(probe2symbol_df, by="probe_id") %>% 
+            select(-probe_id) %>%  
+            select(symbol,everything()) %>%  
+            mutate(rowMean = rowMeans(.[,-1])) %>% 
+            arrange(desc(rowMean)) %>% 
+            distinct(symbol,.keep_all = T) %>% 
+            select(-rowMean) %>% 
+            column_to_rownames("symbol")
+
+output_file <- paste0(output_dir, geoID, "_norm_exprSet.Rdata")
+save(exprSet,file = output_file)
+write.csv(exprSet, file = paste0(output_dir, geoID, "_norm_exprSet.csv"))
+```
+
+## 3. Differential expressed genes
+```{r}
+# You may need to modify the scripts below accordingly to fit your requirements.
+
+View(metadata)
+
+if(geoID == "GSE62402"){
+    get_label <- function(description) {
+    if (grepl("high", description, ignore.case = TRUE)) {
+      return("control")
+    } else if (grepl("low", description, ignore.case = TRUE)) {
+      return("case")
+    } else {
+      return("unknown")
+    }}
+    group <- unlist(lapply(metadata$source_name_ch1, get_label))
+}
+group
+
+if(geoID == "GSE362"){
+    get_label <- function(description) {
+    if (grepl("B", description, ignore.case = TRUE)) {
+      return("case")
+    } else if (grepl("low", description, ignore.case = TRUE)) {
+      return("A")
+    } else {
+      return("control")
+    }}
+    group <- unlist(lapply(metadata$title, get_label))
+}
+group
+
+if(geoID == "GSE2208"){
+    get_label <- function(description) {
+    if (grepl("high", description, ignore.case = TRUE)) {
+      return("control")
+    } else if (grepl("low", description, ignore.case = TRUE)) {
+      return("case")
+    } else {
+      return("unknown")
+    }}
+    group <- unlist(lapply(metadata$description.1, get_label))
+}
+group
+
+if(geoID == "GSE6711"){
+    get_label <- function(description) {
+    if (grepl("not treated", description, ignore.case = TRUE)) {
+      return("control")
+    } else if (grepl("dexamethasone", description, ignore.case = TRUE)) {
+      return("case")
+    } else {
+      return("unknown")
+    }}
+    group <- unlist(lapply(metadata$treatment_protocol_ch1, get_label))
+}
+group
+
+if(geoID == "GSE7158"  || geoID == "GSE7429" ){
+    get_label <- function(description) {
+    if (grepl("high", description, ignore.case = TRUE)) {
+      return("control")
+    } else if (grepl("low", description, ignore.case = TRUE)) {
+      return("case")
+    } else {
+      return("unknown")
+    }}
+    group <- unlist(lapply(metadata$title, get_label))
+}
+group
+
+if(geoID == "GSE13850"){
+    get_label <- function(description) {
+    if (grepl("smoker", description, ignore.case = TRUE)) {
+      return("unknown")
+    } else if (grepl("low", description, ignore.case = TRUE)) {
+      return("case")
+    } else if (grepl("high", description, ignore.case = TRUE)) {
+      return("control")
+    } else {
+      return("unknown")
+    }}
+    group <- unlist(lapply(metadata$description, get_label))
+}
+group
+
+if(geoID == "GSE35959"){
+    get_label <- function(description) {
+    if (grepl("-C|-old|senescent", description, ignore.case = TRUE)) {
+      return("control")
+    } else if (grepl("OP", description, ignore.case = TRUE)) {
+      return("case")
+    } else {
+      return("unknown")
+    }}
+    group <- unlist(lapply(metadata$title, get_label))
+}
+group
+
+if(geoID == "GSE30159"){
+    get_label <- function(description) {
+    if (grepl("pre", description, ignore.case = TRUE)) {
+      return("control")
+    } else if (grepl("post", description, ignore.case = TRUE)) {
+      return("case")
+    } else {
+      return("unknown")
+    }}
+    group <- unlist(lapply(metadata$title, get_label))
+}
+
+if(geoID == "GSE37271"){
+    get_label <- function(description) {
+    if (grepl("control", description, ignore.case = TRUE)) {
+      return("control")
+    } else if (grepl("Taatjes", description, ignore.case = TRUE)) {
+      return("case")
+    } else {
+      return("unknown")
+    }}
+    group <- unlist(lapply(metadata$description, get_label))
+}
+
+if(geoID == "GSE58474"){
+    get_label <- function(description) {
+    if (grepl("iliac", description, ignore.case = TRUE)) {
+      return("control")
+    } else if (grepl("mandible", description, ignore.case = TRUE)) {
+      return("case")
+    } else {
+      return("unknown")
+    }}
+    group <- unlist(lapply(metadata$title, get_label))
+}
+
+if(geoID == "GSE63009"){
+    get_label <- function(description) {
+    if (grepl("vehicle", description, ignore.case = TRUE)) {
+      return("control")
+    } else if (grepl("100 nM", description, ignore.case = TRUE)) {
+      return("case")
+    } else {
+      return("unknown")
+    }}
+    group <- unlist(lapply(metadata$description, get_label))
+}
+
+if(geoID == "GSE71102"){
+    get_label <- function(description) {
+    if (grepl("Control", description, ignore.case = TRUE)) {
+      return("control")
+    } else if (grepl("Dexamethasone", description, ignore.case = TRUE) || grepl("CpdA", description, ignore.case = TRUE) ) {
+      return("case")
+    } else {
+      return("unknown")
+    }}
+    group <- unlist(lapply(metadata$title, get_label))
+}
+
+if(geoID == "GSE80614"){
+    get_label <- function(description) {
+    if (grepl("AD", description, ignore.case = TRUE)) {
+      return("control")
+    } else if (grepl("OS", description, ignore.case = TRUE)) {
+      return("case")
+    } else {
+      return("unknown")
+    }}
+    group <- unlist(lapply(metadata$title, get_label))
+}
+
+if(geoID == "GSE84500"){
+    get_label <- function(description) {
+    if (grepl("undifferentiated", description, ignore.case = TRUE)) {
+      return("control")
+    } else if (grepl("differentiated", description, ignore.case = TRUE)) {
+      return("case")
+    } else {
+      return("unknown")
+    }}
+    group <- unlist(lapply(metadata$description, get_label))
+}
+group
+
+if(geoID == "GSE1428"){
+    get_label <- function(description) {
+    if (grepl("Young", description, ignore.case = TRUE)) {
+      return("control")
+    } else if (grepl("Old", description, ignore.case = TRUE)) {
+      return("case")
+    } else {
+      return("unknown")
+    }}
+    group <- unlist(lapply(metadata$description, get_label))
+}
+group
+
+if(geoID=="GSE56815" || geoID == "GSE56814"){
+  get_label <- function(description) {
+  if (grepl("high BMD", description, ignore.case = TRUE)) {
+    return("control")
+  } else if (grepl("low BMD", description, ignore.case = TRUE)) {
+    return("case")
+  } else {
+    return("unknown")
+  }}
+  group <- unlist(lapply(metadata$title, get_label))
+}
+group
+
+if(geoID=="GSE136344"){
+  get_label <- function(description) {
+  if (grepl("SX", description, ignore.case = TRUE)) {
+    return("unknown")
+  } else if (grepl("young", description, ignore.case = TRUE)) {
+    return("control")
+  } else if (grepl("Old", description, ignore.case = TRUE)) {
+    return("case")
+  } else {
+    return("unknown")
+  }}
+  group <- unlist(lapply(metadata$title, get_label))
+}
+group
+
+if(geoID == "GSE52699"){
+    get_label <- function(description) {
+    if (grepl("young", description, ignore.case = TRUE)) {
+      return("control")
+    } else if (grepl("old", description, ignore.case = TRUE)) {
+      return("case")
+    } else {
+      return("unknown")
+    }}
+    group <- unlist(lapply(metadata$title, get_label))
+}
+
+if(geoID == "GSE5106"){
+    get_label <- function(description) {
+    if (grepl("Placebo", description, ignore.case = TRUE)) {
+      return("control")
+    } else if (grepl("Testosterone", description, ignore.case = TRUE)) {
+      return("case")
+    } else {
+      return("unknown")
+    }}
+    group <- unlist(lapply(metadata$title, get_label))
+}
+
+if(geoID == "GSE90548"){
+    get_label <- function(description) {
+    if (grepl("treatment control", description, ignore.case = TRUE)) {
+      return("control")
+    } else if (grepl("17-B-estradiol treatment", description, ignore.case = TRUE)) {
+      return("case")
+    } else {
+      return("unknown")
+    }}
+    group <- unlist(lapply(metadata$description, get_label))
+}
+#group <- unlist(lapply(metadata$`bone mineral density:ch1`, get_label))
+group
+#exprSet <- exprSet_bak
+if("unknown" %in% group){
+  exprSet <- exprSet[,-which(group=="unknown")]
+  group   <- group[-which(group=="unknown")]
+}
+
+group <- factor(group,levels = c("control", "case"))
+table(group)
+
+any(is.na(exprSet))
+
+# save the trait
+meta_info_df <- as.data.frame(cbind(metadata$geo_accession,as.character(group)))
+colnames(meta_info_df) <- c("sampleID", "group")
+meta_info_df <- meta_info_df %>% mutate(group = recode(group, "control" = 0, "case" = 1))
+output_file  <- paste0(output_dir, geoID, "_meta_info.csv")
+write.csv(meta_info_df, output_file, row.names = FALSE)
+```
+
+
+```{r}
+### 主成分分析PCA：提前预测结果
+### 行是样本列是基因
+View(exprSet)
+library(factoextra)
+
+# We many need to run the commands below in the console directly to generate the figure.
+output_file <- paste0(output_dir, geoID, "_PCA.pdf")
+#output_file <- "C:/Users/dell/Documents/GitHub/osteoporosis_sarcopenia_analysis/output_degs/Osteoporosis_GSE56815/GSE56815_PCA.pdf"
+output_file
+pdf(output_file) 
+res.pca <- prcomp(t(exprSet)) #, scale = TRUE RT: Each row is a sample, and the column refers to genes.
+fviz_pca_ind(res.pca,col.ind = group)
+dev.off()  # 关闭 PDF 设备
+
+length(group)
+```
+
+```{r}
+### 构建比较矩阵
+#design <- model.matrix(~group)
+design <- model.matrix(~0+group)
+### 比较矩阵命名
+colnames(design) <- levels(group)
+design
+```
+
+```{r}
+### 2.线性模型拟合
+library(limma)
+fit <- lmFit(exprSet,design)
+head(fit$coefficients)
+contrasts <- makeContrasts(case - control, levels=design) 
+contrasts
+
+## can define multiple contrasts
+## e.g. makeContrasts(Group1 - Group2, Group2 - Group3,....levels=design)
+fit2 <- contrasts.fit(fit, contrasts)
+fit2
+
+### 3.贝叶斯检验
+fit2 <- eBayes(fit2)
+topTable(fit2)
+decideTests(fit2)
+table(decideTests(fit2))
+```
+
+```{r}
+### 4.输出差异分析结果,其中coef的数目不能操过design的列数
+### 此处的2代表的是design中第二列和第一列的比较
+#allDiff=topTable(fit2,adjust='fdr',coef=2,number=Inf) 
+allDiff <- topTable(fit2,number=Inf) 
+allDiff
+output_file <- paste0(output_dir, geoID, "_all_diff.csv")
+#output_file <- paste0(output_dir, geoID, "_young_vs_healthOld_all_diff.csv")
+output_file
+write.csv(allDiff, output_file)
+
+allDiff[which(allDiff$adj.P.Val<0.05 & abs(allDiff$logFC)>1),]
+allDiff[which(allDiff$adj.P.Val<0.05 & abs(allDiff$logFC)>0),]
+allDiff[which(allDiff$P.Value<0.05 & abs(allDiff$logFC)>1),]
+allDiff[which(allDiff$P.Value<0.05),]
+
+significant_genes <- allDiff[which(allDiff$adj.P.Val<0.05 & abs(allDiff$logFC)>1),]
+significant_genes
+output_file <- paste0(output_dir, geoID, "_significant_gene_list.csv")
+write.csv(significant_genes, output_file)
+hist(allDiff$adj.P.Val)
+getwd()
+```
+
+```{r}
+###################################################################################
+### 定义差异基因：差异倍数2倍，矫正后的p值小于0.05
+library(dplyr)
+diffgene <- allDiff %>% 
+  filter(adj.P.Val < 0.05) %>% 
+  filter(abs(logFC) >1)
+diffgene
+### 如果出现行名丢失的情况，需要先把行名变成列，处理完毕后再把列变成行名
+### 这个工作是由tibble这个包里面的rownames_to_column()和column_to_rownames()完成的
+library(tibble)
+diffgene <- allDiff %>% 
+  rownames_to_column() %>% 
+  filter(adj.P.Val < 0.05) %>% 
+  filter(abs(logFC) >1) %>% 
+  column_to_rownames()
+diffgene
+
+### 可选方案:使用subset直接获取,&是and的意思
+diffgene <- subset(allDiff,abs(logFC) >1 & adj.P.Val < 0.05)
+test <- allDiff[allDiff$adj.P.Val < 0.05 & abs(allDiff$logFC)>1,]
+diffgene
+
+### 该数据也需要保存，此处一次性保存两个数据，如果是多个，一次写入变量名称即可。
+save(diffgene,group,file = "output/diffgene.Rdata")
+### 到此差异基因的分析就结束了
+diffgene
+```
+
+```{r}
+library(ggrepel)
+library(tibble)
+p_cutoff <- 0.05
+fc_cutoff <- 1
+topN <- 20
+
+if (length(dev.list()) > 0) {
+  dev.off()
+} else {
+  print("No device to close.")
+}
+
+# We many need to run the commands below in the console directly to generate the figure.
+output_file <- paste0(output_dir, geoID, "_VolcanoPlot.pdf")
+output_file
+
+pdf(output_file) 
+allDiff %>% 
+  rownames_to_column(var = "Symbol") %>%
+  mutate(Significant = adj.P.Val < p_cutoff, abs(logFC) > fc_cutoff) %>% 
+  mutate(Rank = row_number(), 
+         Label = ifelse(Rank < topN, Symbol, ""),
+         Significant = ifelse(Significant, "TRUE", "FALSE")) %>% 
+  ggplot(aes(x = logFC, y = B, col = Significant, label = Label)) +
+  geom_point() + 
+  geom_text_repel(col = "black") +
+  scale_color_manual(values = c("TRUE" = "red" , "FALSE"="blue"))
+dev.off()  # 关闭 PDF 设备
+```
+
+```{r}
+####################################################################################
+####################################################################################
+## 作图环节
+## 1.把现在数据调整成可以作图的格式
+### 这个技能是data wrangling部分重点掌握的技能
+### 复习一下流程：输入数据是表达量，经过三步
+### 1.探针ID转换，2.行列转置，3，添加分组信息。最终获得的是数据框
+
+### 行列转置
+exprSet <- as.data.frame(t(exprSet))
+### 添加分组信息
+dd <- cbind(group=group,exprSet)
+dd
+sampleInfo <- select(dd, 'group')
+sampleInfo
+
+### 截取部分展示,这就是清洁数据
+test = dd[,1:10]
+
+## 2.作图展示
+rownames(diffgene[1,])
+
+library(ggplot2)
+ggplot(data = dd,aes(x=group,y=HOXB2,fill=group))+
+  geom_boxplot()+
+  geom_point()+
+  theme_bw()
+```
+
+```{r}
+## 4.多个基因作图查看
+## 先把基因提取出来
+genelist <- rownames(diffgene)[1:4]
+genelist <- rownames(diffgene)[1:3]
+## 再提取表达量，使用名称选取行
+data <- dd[,c("group",genelist)]
+## 用pivot_longer调整数据，数据变长，增加的是行
+library(tidyr)
+data <- data %>%
+  pivot_longer(cols=-1,
+               names_to= "gene",
+               values_to = "expression")
+## 多基因作图
+# We many need to run the commands below in the console directly to generate the figure.
+output_file <- paste0(output_dir, geoID, "_MultiGenesBoxPlot.pdf")
+output_file
+my_comparisons <- list(
+  c("case", "control")
+)
+
+library(ggpubr)
+pdf(output_file)
+ggplot(data = data,aes(x=group,y=expression,fill=group))+
+  geom_boxplot()+
+  geom_jitter()+
+  theme_bw()+
+  scale_fill_manual(values = c("case" = "coral1", "control" = "deepskyblue2")) +
+  facet_grid(.~gene)+
+  stat_compare_means(comparisons = my_comparisons, label = "p.signif", method = "t.test")
+dev.off()
+
+# ## 图片导出 # this doesn't work at Rstudio Markdown mode.
+# library(export)
+# ## 导成PPT可编辑的格式
+# getwd()
+# graph2ppt(file="output/diffgenboxplot.pptx")
+# ## 其他自己想要的格式
+# graph2pdf(file="output/diffgenboxplot.pdf")
+# graph2tif(file="output/diffgenboxplot.tif")
+# ## 导成AI可以编辑的状态
+# graph2eps(file="output/diffgenboxplot.eps")
+```
+
+##Heatmap
+```{r}
+library(pheatmap)
+## argument use="c" stops an error if there are any missing data points
+
+View(exprSet)
+
+ids_of_interest <- rownames(allDiff[which(allDiff$adj.P.Val<0.05 & abs(allDiff$logFC)>1),])
+ids_of_interest
+length(ids_of_interest)
+
+gene_matrix <- exprSet[,ids_of_interest]
+"HOXB2" %in% colnames(exprSet)
+
+project_path <- getwd()
+output_dir   <- paste0(project_path, "/output_degs/", disease_name,"_", geoID,"/")
+output_file  <- paste0(output_dir, geoID, "_degs_heatmap.pdf")
+output_file
+pdf(output_file)
+
+pheatmap(gene_matrix)
+pheatmap(t(gene_matrix), annotation_col=sampleInfo)
+cor(gene_matrix)
+dev.off()
+
+group
+```
+
+## double check my results with GEOexplorer's
+```{r}
+library(dplyr)
+library(ggplot2)
+library(ggpubr)
+
+projecr_path <- getwd()
+disease_name <- "Sarcopenia"
+geoID        <- "GSE1428"
+output_dir   <- paste0(projecr_path, "/output_degs/",disease_name,"_",geoID,"/")
+output_dir
+
+# use the variable directly
+my_results_df <- allDiff
+my_results_df <- rownames_to_column(my_results_df, var = "Gene.symbol")
+# import from file
+my_results_file <- paste0(output_dir, geoID, "_all_diff.csv")
+my_results_df   <- read.csv(my_results_file)
+colnames(my_results_df)[colnames(my_results_df) == "X"] <- "Gene.symbol"
+my_results_df
+
+geoexplorer_file <- paste0(output_dir, geoID, "_GEOexplorer_top_differentially_expressed_genes_norm.csv")
+geoexplorer_df   <- read.csv(geoexplorer_file)
+geoexplorer_df
+
+degs_intersection_list <- inner_join(my_results_df, geoexplorer_df, by = "Gene.symbol")
+degs_intersection_list
+```
+
+I think GEOexplorer does not merge probes within the same gene may affect the correlation results. therefore, let's have a try with exclude those multi-gene mapping probes.
+```{r}
+degs_intersection_list_bak <- degs_intersection_list
+
+degs_intersection_list <- degs_intersection_list %>%
+  group_by(Gene.symbol) %>%
+  filter(n() == 1) %>%
+  ungroup()
+degs_intersection_list
+```
+
+```{r}
+plot(degs_intersection_list$logFC.x,degs_intersection_list$logFC.y)
+# 假设 degs_intersection_list 已经存在，并包含 logFC.x 和 logFC.y 列
+# 创建散点图
+p <- ggplot(degs_intersection_list, aes(x = logFC.x, y = logFC.y)) +
+  geom_point(color = "blue", size = 2, alpha = 0.6) +  # 绘制点
+  geom_smooth(method = "lm", color = "red", se = FALSE) +  # 添加回归线
+  stat_cor(method = "pearson", label.x.npc = 'right', label.y.npc = 'top', size = 5, color = "black", hjust = 1) +  # 添加相关系数
+  labs(title = "Scatter Plot of logFC from Two Datasets",
+       x = "logFC from my_results_df",
+       y = "logFC from geoexplorer_df") +  # 添加标题和轴标签
+  theme_minimal() +  # 使用简洁的主题
+  theme(plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+        axis.title.x = element_text(size = 12),
+        axis.title.y = element_text(size = 12),
+        axis.text = element_text(size = 10))
+
+# 显示图形
+print(p)
+```
+
+```{r}
+# 假设 degs_intersection_list 已经存在，并包含 logFC.x 和 logFC.y 列
+# 创建散点图
+plot(degs_intersection_list$adj.P.Val.x, degs_intersection_list$adj.P.Val.y)
+plot(degs_intersection_list$P.Value.x, degs_intersection_list$P.Value.y)
+cor(degs_intersection_list$P.Value.x, degs_intersection_list$P.Value.y)
+View(degs_intersection_list)
+
+p <- ggplot(degs_intersection_list, aes(x = P.Value.x, y = P.Value.y)) +
+  geom_point(color = "blue", size = 2, alpha = 0.6) +  # 绘制点
+  geom_smooth(method = "lm", color = "red", se = FALSE) +  # 添加回归线
+  stat_cor(method = "pearson", label.x.npc = 'right', label.y.npc = 'top', size = 5, color = "black", hjust = 1) +  # 添加相关系数
+  labs(title = "Scatter Plot of Raw p-value from Two Datasets",
+       x = "Raw P.Val from my_results_df",
+       y = "Raw P.Val from geoexplorer_df") +  # 添加标题和轴标签
+  theme_minimal() +  # 使用简洁的主题
+  theme(plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+        axis.title.x = element_text(size = 12),
+        axis.title.y = element_text(size = 12),
+        axis.text = element_text(size = 10))
+
+# 显示图形
+print(p)
+
+## Adjusted P-value
+p <- ggplot(degs_intersection_list, aes(x = adj.P.Val.x, y = adj.P.Val.y)) +
+  geom_point(color = "blue", size = 2, alpha = 0.6) +  # 绘制点
+  geom_smooth(method = "lm", color = "red", se = FALSE) +  # 添加回归线
+  stat_cor(method = "pearson", label.x.npc = 'right', label.y.npc = 'top', size = 5, color = "black", hjust = 1) +  # 添加相关系数
+  labs(title = "Scatter Plot of adjusted p-value from Two Datasets",
+       x = "Adjusted P.Val from my_results_df",
+       y = "Adjusted P.Val from geoexplorer_df") +  # 添加标题和轴标签
+  theme_minimal() +  # 使用简洁的主题
+  theme(plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+        axis.title.x = element_text(size = 12),
+        axis.title.y = element_text(size = 12),
+        axis.text = element_text(size = 10))
+
+# 显示图形
+print(p)
+```
+
+```{r}
+cor(degs_intersection_list$logFC.x, degs_intersection_list$logFC.y)
+cor(degs_intersection_list$adj.P.Val.x, degs_intersection_list$adj.P.Val.y)
+cor(degs_intersection_list$P.Value.x, degs_intersection_list$P.Value.y)
+```
+

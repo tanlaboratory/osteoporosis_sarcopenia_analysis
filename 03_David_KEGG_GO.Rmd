@@ -1,0 +1,107 @@
+---
+title: "03_David_KEGG_GO"
+output: html_document
+date: "2024-05-25"
+---
+
+
+```{r}
+install.packages("ggplot2")
+install.packages("dplyr")
+library(ggplot2)
+library(dplyr)
+rm(list = ls())
+```
+
+
+```{r}
+
+david_results_file <- "./output_degs/David_results/david_os_sa.txt"
+david_results_file <- "./output_degs/David_results/david_os.txt"
+
+# 读取DAVID结果文件
+david_results <- read.table(david_results_file, header = TRUE, sep = "\t")
+View(david_results)
+```
+
+
+```{r}
+# 筛选BP模块显著条目
+bp_results <- david_results %>% filter(Category == "GOTERM_BP_DIRECT" & PValue < 0.05)
+
+# 创建BP条形图
+ggplot(bp_results, aes(x = reorder(Term, -Count), y = Count)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  xlab("Enriched Terms") +
+  ylab("Gene Count") +
+  ggtitle("Biological Process (BP) Enrichment Analysis") +
+  theme_minimal()
+
+
+```
+```{r}
+# 筛选CC模块显著条目
+cc_results <- david_results %>% filter(Category == "GOTERM_CC_DIRECT" & PValue < 0.05)
+
+# 创建CC条形图
+ggplot(cc_results, aes(x = reorder(Term, -Count), y = Count)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  xlab("Enriched Terms") +
+  ylab("Gene Count") +
+  ggtitle("Cellular Component (CC) Enrichment Analysis") +
+  theme_minimal()
+
+```
+```{r}
+# 筛选MF模块显著条目
+mf_results <- david_results %>% filter(Category == "GOTERM_MF_DIRECT" & PValue < 0.05)
+
+# 创建MF条形图
+ggplot(mf_results, aes(x = reorder(Term, -Count), y = Count)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  xlab("Enriched Terms") +
+  ylab("Gene Count") +
+  ggtitle("Molecular Function (MF) Enrichment Analysis") +
+  theme_minimal()
+
+```
+
+```{r}
+# 创建BP气泡图
+ggplot(bp_results, aes(x = reorder(Term, -Count), y = -log10(PValue), size = Count)) +
+  geom_point() +
+  coord_flip() +
+  xlab("Enriched Terms") +
+  ylab("-log10(PValue)") +
+  ggtitle("Biological Process (BP) Enrichment Analysis") +
+  theme_minimal()
+
+```
+
+```{r}
+# 创建CC气泡图
+ggplot(cc_results, aes(x = reorder(Term, -Count), y = -log10(PValue), size = Count)) +
+  geom_point() +
+  coord_flip() +
+  xlab("Enriched Terms") +
+  ylab("-log10(PValue)") +
+  ggtitle("Cellular Component (CC) Enrichment Analysis") +
+  theme_minimal()
+
+```
+
+```{r}
+# 创建MF气泡图
+ggplot(mf_results, aes(x = reorder(Term, -Count), y = -log10(PValue), size = Count)) +
+  geom_point() +
+  coord_flip() +
+  xlab("Enriched Terms") +
+  ylab("-log10(PValue)") +
+  ggtitle("Molecular Function (MF) Enrichment Analysis") +
+  theme_minimal()
+
+```
+
