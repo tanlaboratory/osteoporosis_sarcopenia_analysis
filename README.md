@@ -2,36 +2,33 @@
 
 
 
-## Dependencies
+## Overall Workflow
 
-R and Python with the following required libraries: xxx.
+![workflow figure](./Figure/Figure1_overall_workflow.pdf "Overall workflow")
+
+
 
 
 
 ## Tutorial
 
-### 0. Configure the path
+### Module 1. Differential gene expression analysis
 
-```bash
-script_dir='/path/to/cnv_espresso/src/'
-project_dir='/path/to/cnv_espresso/example/'
-output_rd_dir=${project_dir}'/RD_data/'
-target_file='/path/to/exome.targets.bed'
-reference_file='/path/to/reference.fasta'
-mkdir -p ${project_dir}
-cd ${project_dir}
-```
+Please run the `` script in R or Rstudio.
 
-### Module 1. Differential expressed gene
+### Module 2. Robust Rank Aggregation (RRA)
 
-```bash
-python ${script_dir}cnv_espresso.py windows \
-    --target ${target_file} \
-    --ref    ${reference_file} \
-    --output ${project_dir}
-```
+Please run the `` script in R or Rstudio.
 
-### Step 2. Calculate Read depth for each sample
+### Module 3. Network analysis
+
+Please use [STRING](https://string-db.org) and [Cytoscape](https://cytoscape.org) for network analysis.
+
+### Module 4. Functional enrichment analysis
+
+### Module 5. Machine learning framework
+
+
 
 - Option 1. Single sample 
 
@@ -221,10 +218,8 @@ python ${script_dir}cnv_espresso.py collect_images \
 
 ## Citation
 
-Renjie Tan, Yufeng Shen, Accurate *in silico* confirmation of rare copy number variant calls from exome sequencing data using transfer learning, *Nucleic Acids Research*, 2022;, gkac788, https://doi.org/10.1093/nar/gkac788
+[TBD] Submitted to a peer-reviewed journal.
 
 ## Contact
 
-Renjie Tan (rt2776 at cumc.columbia.edu) or Yufeng Shen (ys2411 at cumc.columbia.edu)
-
-#### [Shen Lab](http://www.columbia.edu/~ys2411/)
+Renjie Tan (renjie.tan at hrbmu.edu.cn) 
