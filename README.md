@@ -8,11 +8,11 @@
 
 ### Module 1. Differential gene expression analysis
 
-Please run the [degs_analysis.Rmd](./degs_analysis.Rmd) script in R or Rstudio.
+Please use the [degs_analysis.Rmd](./degs_analysis.Rmd) script in R or Rstudio.
 
 ### Module 2. Robust Rank Aggregation (RRA)
 
-Please run the [RA_intersection.Rmd](RA_intersection.Rmd) script in R or Rstudio.
+Please use the [RRA_intersection.Rmd](RRA_intersection.Rmd) script in R or Rstudio.
 
 ### Module 3. Network analysis
 
@@ -20,7 +20,7 @@ Please use [STRING](https://string-db.org) and [Cytoscape](https://cytoscape.org
 
 ### Module 4. Functional enrichment analysis
 
-Please run the [functional_enrichment_analysis.Rmd](functional_enrichment_analysis.Rmd) script in R or Rstudio.
+Please use the [functional_enrichment_analysis.Rmd](functional_enrichment_analysis.Rmd) script in R or Rstudio.
 
 ### Module 5. Machine learning framework
 

@@ -1,27 +1,13 @@
----
-title: "02_degs_intersection"
-output: html_document
-date: "2024-04-16"
----
-
 ```{r}
-#安装RobustRankAggreg包
 #BiocManager::install("RobustRankAggreg")
-
 rm(list = ls())
 library(dplyr)
 library(RobustRankAggreg)
 ```
 
-
 ```{r}
 getwd()
-setwd("C:/Users/dell/Documents/GitHub/osteoporosis_sarcopenia_analysis/")
-
-#osteoporosis_degs_list <- read.csv(file="./output_degs/Osteoporosis_GSE90548_all_diff.csv") # first try
-#sarcopenia_degs_list   <- read.csv(file="./output_degs/Sarcopenia_GSE136344/GSE136344_all_diff.csv")
-#View(osteoporosis_degs_list)
-#View(sarcopenia_degs_list)
+setwd("/Path/to/osteoporosis_sarcopenia_analysis/")
 
 # osteoporosis
 GSE56814_degs_list <- read.csv(file="./output_degs/Osteoporosis_GSE56814/GSE56814_all_diff.csv")
@@ -30,325 +16,47 @@ GSE35959_degs_list <- read.csv(file="./output_degs/Osteoporosis_GSE35959/GSE3595
 GSE62402_degs_list <- read.csv(file="./output_degs/Osteoporosis_GSE62402/GSE62402_all_diff.csv")
 GSE13850_degs_list <- read.csv(file="./output_degs/Osteoporosis_GSE13850/GSE13850_all_diff.csv")
 
-## Used for validation dataset
-GSE7158_degs_list  <- read.csv(file="./output_degs/Osteoporosis_GSE7158/GSE7158_all_diff.csv")
-GSE7429_degs_list  <- read.csv(file="./output_degs/Osteoporosis_GSE7429/GSE7429_all_diff.csv")
-
-## Uncertain for osteoporosis uses
-#GSE90548_degs_list <- read.csv(file="./output_degs/Osteoporosis_GSE90548/GSE90548_all_diff.csv")
-#GSE80614_degs_list <- read.csv(file="./output_degs/Osteoporosis_GSE80614/GSE80614_all_diff.csv")
-#GSE58474_degs_list <- read.csv(file="./output_degs/Osteoporosis_GSE58474/GSE58474_all_diff.csv")
-#GSE84500_degs_list <- read.csv(file="./output_degs/Osteoporosis_GSE84500/GSE84500_all_diff.csv")
-#GSE37271_degs_list <- read.csv(file="./output_degs/Osteoporosis_GSE37271/GSE37271_all_diff.csv")
-
 # sarcopenia
 GSE136344_degs_list <- read.csv(file="./output_degs/Sarcopenia_GSE136344/GSE136344_all_diff.csv")
 GSE1428_degs_list   <- read.csv(file="./output_degs/Sarcopenia_GSE1428/GSE1428_all_diff.csv")
-
-```
-
-
-```{r}
-select_degs_genes <- function(degs_list){
-  #degs_list_selected <- degs_list[which(degs_list$adj.P.Val<0.05 & abs(degs_list$logFC)>0),]
-  degs_list_selected <- degs_list[which(degs_list$P.Val<0.05 & abs(degs_list$logFC)>0),]
-  return(degs_list_selected)
-}
-
-# OS
-gene_selection_type <- "selected_p005_fc0"
-GSE56814_degs_selected_list <- select_degs_genes(GSE56814_degs_list)
-GSE56815_degs_selected_list <- select_degs_genes(GSE56815_degs_list)
-GSE35959_degs_selected_list <- select_degs_genes(GSE35959_degs_list)
-GSE62402_degs_selected_list <- select_degs_genes(GSE62402_degs_list)
-GSE13850_degs_selected_list <- select_degs_genes(GSE13850_degs_list)
-# GSE7158_degs_selected_list  <- select_degs_genes(GSE7158_degs_list)
-
-# GSE7429_degs_selected_list  <- select_degs_genes(GSE7429_degs_list)
-# GSE90548_degs_selected_list <- select_degs_genes(GSE90548_degs_list)
-# GSE80614_degs_selected_list <- select_degs_genes(GSE80614_degs_list)
-# GSE58474_degs_selected_list <- select_degs_genes(GSE58474_degs_list)
-# GSE84500_degs_selected_list <- select_degs_genes(GSE84500_degs_list)
-# GSE37271_degs_selected_list <- select_degs_genes(GSE37271_degs_list)
-
-# Sa
-GSE136344_degs_selected_list <- select_degs_genes(GSE136344_degs_list)
-GSE1428_degs_selected_list   <- select_degs_genes(GSE1428_degs_list)
-
-# dim(GSE90548_degs_list)
-# dim(GSE90548_degs_selected_list)
-# dim(GSE80614_degs_list)
-# dim(GSE80614_degs_selected_list)
-# dim(GSE58474_degs_list)
-# dim(GSE58474_degs_selected_list)
-# dim(GSE84500_degs_list)
-# dim(GSE84500_degs_selected_list)
-# dim(GSE37271_degs_list)
-# dim(GSE37271_degs_selected_list)
-# dim(GSE35959_degs_list)
-# dim(GSE35959_degs_selected_list)
-
-# dim(GSE56814_degs_list)
-# dim(GSE56814_degs_selected_list)
-# dim(GSE56815_degs_list)
-# dim(GSE56815_degs_selected_list)
-
-dim(GSE136344_degs_list)
-dim(GSE136344_degs_selected_list)
-dim(GSE1428_degs_list)
-dim(GSE1428_degs_selected_list)
 ```
 
 ## Using RRA to intergrate gene lists. We treat OS and SA seperately.
 ```{r}
-# os_glist <- list(gene_set1=GSE90548_degs_selected_list$X,
-#               gene_set2=GSE80614_degs_selected_list$X,
-#               gene_set3=GSE58474_degs_selected_list$X,
-#               gene_set4=GSE84500_degs_selected_list$X,
-#               gene_set5=GSE37271_degs_selected_list$X,
-#               gene_set6=GSE35959_degs_selected_list$X)
-
-os_glist <- list(gene_set1=GSE56814_degs_selected_list$X,
-                 gene_set2=GSE56815_degs_selected_list$X,
-                 gene_set3=GSE35959_degs_selected_list$X,
-                 gene_set4=GSE62402_degs_selected_list$X,
-                 gene_set5=GSE13850_degs_selected_list$X)
-
-sa_glist <- list(gene_set1=GSE136344_degs_selected_list$X,
-                 gene_set2=GSE1428_degs_selected_list$X)
-
-## use all genes for OS and SA, co-disease analysis
-gene_selection_type <- "all_genes"
 os_glist <- list(gene_set1=GSE56814_degs_list$X,
                  gene_set2=GSE56815_degs_list$X,
                  gene_set3=GSE35959_degs_list$X,
                  gene_set4=GSE62402_degs_list$X,
                  gene_set5=GSE13850_degs_list$X)
 
-
 sa_glist <- list(gene_set1=GSE136344_degs_list$X,
                  gene_set2=GSE1428_degs_list$X)
 
-getwd()
 ```
 
 ```{r}
-#统计所有基因出现的次数
-os_freq <- as.data.frame(table(unlist(os_glist)))
-os_freq
-#应用RRA算法，对基因进行整合排序
-os_ag <- aggregateRanks(os_glist)
-#添加基因出现的次数
+#RRA genes and annotate w/ the freq. of each gene
+os_freq    <- as.data.frame(table(unlist(os_glist)))
+os_ag      <- aggregateRanks(os_glist)
 os_ag$Freq <- os_freq[match(os_ag$Name,os_freq$Var1),2]
-os_ag
-dim(os_ag)
 os_ag_significant <- os_ag[which(os_ag$Score <= 0.05),]
-os_ag_significant
-dim(os_ag_significant)
-View(os_ag_significant)
 
-getwd()
-output_file=paste0("./output_degs/RRA_results/",gene_selection_type,"_RRA_list_for_os.csv")
-output_file
+output_file <- paste0("./output_degs/RRA_results/RRA_list_for_os.csv")
 write.csv(os_ag_significant, output_file)
 
-#统计所有基因出现的次数
-sa_freq <- as.data.frame(table(unlist(sa_glist)))
-sa_freq
-#应用RRA算法，对基因进行整合排序
-sa_ag <- aggregateRanks(sa_glist)
-#添加基因出现的次数
+sa_freq    <- as.data.frame(table(unlist(sa_glist)))
+sa_ag      <- aggregateRanks(sa_glist)
 sa_ag$Freq <- sa_freq[match(sa_ag$Name,sa_freq$Var1),2]
-sa_ag
-dim(sa_ag)
 sa_ag_significant <- sa_ag[which(sa_ag$Score <= 0.05),]
-sa_ag_significant
-dim(sa_ag_significant)
 
 getwd()
-output_file=paste0("./output_degs/RRA_results/",gene_selection_type,"_RRA_list_for_sa.csv")
-output_file
+output_file <- paste0("./output_degs/RRA_results/RRA_list_for_sa.csv")
 write.csv(sa_ag_significant, output_file)
 ```
+
 ### intersection of RRA OS and SA
 ```{r}
 intersection_list <- inner_join(os_ag_significant, sa_ag_significant, by = "Name")
-intersection_list
-getwd()
-output_file=paste0("./output_degs/RRA_results/", gene_selection_type, "_RRA_list_intersection_os_sa.csv")
-output_file
+output_file       <- paste0("./output_degs/RRA_results/RRA_list_intersection_os_sa.csv")
 write.csv(intersection_list, output_file)
 ```
-
-<!-- ## Using RRA to intergrate gene lists. If we treat OS and SA together. -->
-<!-- ```{r} -->
-<!-- os_sa_glist <- list(gene_set1=GSE90548_degs_selected_list$X, -->
-<!--                    gene_set2=GSE80614_degs_selected_list$X, -->
-<!--                    gene_set3=GSE58474_degs_selected_list$X, -->
-<!--                    gene_set4=GSE84500_degs_selected_list$X, -->
-<!--                    gene_set5=GSE37271_degs_selected_list$X, -->
-<!--                    gene_set6=GSE35959_degs_selected_list$X, -->
-<!--                    gene_set7=GSE136344_degs_selected_list$X, -->
-<!--                    gene_set8=GSE1428_degs_selected_list$X) -->
-
-<!-- os_sa_freq <- as.data.frame(table(unlist(os_sa_glist))) -->
-<!-- os_sa_freq -->
-<!-- #应用RRA算法，对基因进行整合排序 -->
-<!-- os_sa_ag <- aggregateRanks(os_sa_glist) -->
-<!-- os_sa_ag$Freq <- os_sa_freq[match(os_sa_ag$Name,os_sa_freq$Var1),2] -->
-
-<!-- os_sa_ag -->
-<!-- os_sa_ag_significant <- os_sa_ag[which(os_sa_ag$Score <= 0.05),] -->
-<!-- os_sa_ag_significant_gene_list <- os_sa_ag_significant$Name -->
-<!-- os_sa_ag_significant_gene_list -->
-
-<!-- getwd() -->
-<!-- output_file="./output_degs/02_RRA_shared_gene_list_by_os_sa.csv" -->
-<!-- write.csv(os_sa_ag_significant_gene_list, output_file) -->
-<!-- ``` -->
-
-## we need to draw a heatplot for the intergrated genes
-```{r}
-selected_gene_list <- c("BCL6", "DDIT4",  "FLNA", "FOXO1", "FOXO3", "IRS1",  "NFKBIA", "PGK1", "STAT3")
-#selected_gene_list <- intersection_list$Name
-
-select_degs_logFC_df <- function(degs_df, gene_list, geoID){
-  rownames(degs_df) <- degs_df$X
-  degs_df           <- degs_df[gene_list,c("X","logFC")]
-  colnames(degs_df) <- c("GeneID",geoID)
-  rownames(degs_df) <- gene_list
-  degs_df           <- select(degs_df,geoID)
-  return(degs_df)
-}
-
-library(pheatmap)
-GSE56814_logFC_df  <- select_degs_logFC_df(GSE56814_degs_list,  selected_gene_list, "GSE56814")
-GSE56815_logFC_df  <- select_degs_logFC_df(GSE56815_degs_list,  selected_gene_list, "GSE56815")
-GSE35959_logFC_df  <- select_degs_logFC_df(GSE35959_degs_list,  selected_gene_list, "GSE35959")
-GSE62402_logFC_df  <- select_degs_logFC_df(GSE62402_degs_list,  selected_gene_list, "GSE62402")
-GSE13850_logFC_df  <- select_degs_logFC_df(GSE13850_degs_list,  selected_gene_list, "GSE13850")
-
-GSE136344_logFC_df <- select_degs_logFC_df(GSE136344_degs_list, selected_gene_list, "GSE136344")
-GSE1428_logFC_df   <- select_degs_logFC_df(GSE1428_degs_list,   selected_gene_list, "GSE1428")
-
-all_logFC_df <- cbind(GSE56814_logFC_df, GSE56815_logFC_df, GSE35959_logFC_df, GSE62402_logFC_df, GSE13850_logFC_df, 
-                      GSE136344_logFC_df, GSE1428_logFC_df)
-
-all_logFC_df <- na.omit(all_logFC_df)
-
-getwd()
-output_file=paste0(getwd(),"/output_degs/RRA_results/",gene_selection_type,"_RRA_list_intersection_os_sa_heatmap.pdf")
-output_file
-
-## for hub genes
-pdf(output_file, width = 7, height = 4)  # 设置宽度和高度
-#pdf(output_file)  # 设置宽度和高度
-pheatmap(all_logFC_df,
-         cluster_rows = FALSE, 
-         cluster_cols = FALSE,
-         display_numbers = TRUE, 
-         color = colorRampPalette(c("lightblue", "white", "firebrick3"))(500),
-         fontsize = 10,         # 调整文字大小
-         fontsize_number = 10,  # 调整数字的大小
-         angle_col = 0         # 改变 x 轴标签的方向
-)
-dev.off()
-
-## for all 99 genes
-pdf(output_file)  # 设置宽度和高度
-pheatmap(all_logFC_df,
-         cluster_rows = TRUE, 
-         cluster_cols = FALSE,
-         display_numbers = FALSE, 
-         color = colorRampPalette(c("blue", "white", "firebrick3"))(500),
-         fontsize = 5,         # 调整文字大小
-         fontsize_number = 10,  # 调整数字的大小
-         angle_col = 0         # 改变 x 轴标签的方向
-)
-dev.off()
-```
-
-Next, we set the RRA results, 99 genes to string and cytoscape.
-
-We show the Venn diagram for string and cytoscape results below:
-```{r}
-MCC <- c("AK2", "BCL6", "BPGM", "CTPS1", "DDIT4", "DNM1L", "FLNA", "FOXO1", "FOXO3", "HTT", "IDH1", "IRS1", "NFKBIA", "PFKFB2", "PGK1", "PKM", "POLR2A", "PSMA1", "PSMD3", "STAT3")
-
-DMNC <- c("FLNA", "IDH1", "BPGM", "IRS1", "DNM1L", "CTPS1", "PFKFB2", "ZBTB16", "AK2", "ZSWIM8", "POMP", "FOXO1", "BCL6", "NFKBIA", "MAPK6", "STAT3", "ASNS", "FOXO3", "DDIT4", "PGK1")
-
-Degree <- c("POLR2A", "FLNA", "IDH1", "BPGM", "IRS1", "PFKFB2", "AK2", "ZBTB16", "PKM", "HTT", "FOXO1", "BCL6", "NFKBIA", "MAPK6", "STAT3", "PSMD3", "FOXO3", "PSMA1", "DDIT4", "PGK1")
-
-Betweenness <- c("POLR2A", "FLNA", "IRS1", "XAB2", "DNM1L", "CTPS1", "ZBTB16", "PKM", "HTT", "FOXO1", "BCL6", "NFKBIA", "MAPK6", "STAT3", "PSMD3", "FOXO3", "PSMA1", "DDIT4", "PGK1", "PDSS1")
-
-```
-
-```{r}
-
-install.packages("VennDiagram")
-library(VennDiagram)
-
-# 创建一个列表，包含所有基因列表
-gene_lists <- list(MCC = MCC, DMNC = DMNC, Degree = Degree, Betweenness = Betweenness)
-
-getwd()
-# 绘制 Venn 图并保存为 PDF
-getwd()
-setwd("~/Documents/GitHub/osteoporosis_sarcopenia_analysis/")
-output_file=paste0(getwd(),"/output_degs/Venn_diagram.pdf")
-output_file
-pdf(output_file, width = 10, height = 8)  # 设置宽度和高度
-venn.plot <- venn.diagram(
-  x = gene_lists,
-  category.names = names(gene_lists),
-  filename = NULL,
-  col = "black",
-  fill = c("dodgerblue", "goldenrod1", "darkorange1", "seagreen3"),
-  alpha = 0.50,
-  cex = 2.5,
-  fontfamily = "sans",
-  fontface = "bold",
-  cat.cex = 2.5,
-  cat.fontfamily = "sans",
-  cat.fontface = "bold",
-  cat.pos = 0,
-  cat.dist = 0.05,
-  cat.default.pos = "outer",
-  cat.col = "black"
-)
-grid.draw(venn.plot)
-dev.off()  # 关闭 PDF 设备
-
-
-# 绘制 Venn 图
-venn.plot <- venn.diagram(
-  x = gene_lists,
-  category.names = names(gene_lists),
-  filename = NULL,
-  col = "black",
-  fill = c("dodgerblue", "goldenrod1", "darkorange1", "seagreen3"),
-  alpha = 0.50,
-  cex = 1.5,
-  fontfamily = "sans",
-  fontface = "bold",
-  cat.cex = 1.5,
-  cat.fontfamily = "sans",
-  cat.fontface = "bold",
-  cat.pos = 0,
-  cat.dist = 0.05,
-  cat.default.pos = "outer",
-  cat.col = "black"
-)
-
-# 在绘图窗口中显示 Venn 图
-grid.newpage()
-grid.draw(venn.plot)
-```
-
-```{r}
-# 找到四个列表的交集
-common_genes <- Reduce(intersect, list(MCC, DMNC, Degree, Betweenness))
-
-# 输出结果
-print(common_genes)
-```
-
