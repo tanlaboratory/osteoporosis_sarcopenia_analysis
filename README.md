@@ -2,7 +2,7 @@
 
 ## Overall workflow
 
-![workflow figure](./Figure/Figure1_overall_workflow.png "Overall workflow")
+![workflow figure](./Figure/Figure_1.pdf "Overall workflow")
 
 ## Tutorial
 
