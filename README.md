@@ -1,6 +1,6 @@
 # A systems biology approach to elucidate the association between osteoporosis and sarcopenia
 
-## Overall Workflow
+## Overall workflow
 
 ![workflow figure](./Figure/Figure1_overall_workflow.png "Overall workflow")
 
