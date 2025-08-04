@@ -28,7 +28,7 @@ The machine learning module of this study was implemented in Python. For convien
 
 ## Citation
 
-[TBD] Submitted to a peer-reviewed journal.
+Our manuscript, titled *"Systems biology and experimental validation indicate DDIT4, FOXO1, and STAT3 as shared key genes linking osteoporosis and sarcopenia"* has been submitted to [Frontiers in Genetics](https://www.frontiersin.org/journals/genetics) for peer review.
 
 ## Contact
 
