@@ -7,11 +7,11 @@ rm(list = ls())
 library(clusterProfiler)
 library(KEGG.db)
 library(ggplot2)
-
+library(pathview)
 setwd("/Path/to/osteoporosis_sarcopenia_analysis/")
 ```
 
-# KEGG analysis
+## KEGG analysis
 ```{r}
 # Import gene list
 # gene_list <- diffgene_selected[,"X"]
@@ -38,7 +38,7 @@ dotplot(EGG)
 dev.off()
 ```
 
-# [optional] you can check any specific KEGG pathwy
+## [optional] you can check any specific KEGG pathwy
 ```{r}
 KEGG_df    <- as.data.frame(EGG)
 symboldata <- setReadable(EGG, OrgDb="org.Hs.eg.db", keyType = "ENTREZID")
@@ -52,10 +52,31 @@ output_file
 save(EGG,file = output_file)
 ```
 
-# Gene Ontology analysis
+### 示例：可视化一个具体的KEGG通路，例如 hsa04110 (细胞周期)
 ```{r}
+# 安装和加载pathview
+# BiocManager::install("pathview")
+pathway.id <- "hsa04068"
+pathview(gene.data = gene_entrez$ENTREZID,
+         pathway.id = pathway.id,
+         species = "hsa",
+         gene.idtype = "ENTREZID")
+
+output_dir <- paste0(work_dir, "/output_degs/Kegg_GO/")
+setwd(output_dir)
+for(pathway.id in kegg_enrich$ID){
+  print(pathway.id)
+  pathview(gene.data = gene_entrez$ENTREZID,
+         pathway.id = pathway.id,
+         species = "hsa"
+         ) 
+}
+```
+
 #############################################################################
-### Gene Ontology analysis includes Molecular Function (MF), Cellular Component (CC), and Biological Process (BP)
+## Gene Ontology analysis
+Gene Ontology analysis includes Molecular Function (MF), Cellular Component (CC), and Biological Process (BP)
+```{r}
 ego_all <- enrichGO(gene          = gene$ENTREZID,
                     OrgDb         = "org.Hs.eg.db",
                     ont           = "all",

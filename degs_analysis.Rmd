@@ -18,7 +18,7 @@ BiocManager::install("GEOquery")
 BiocManager::install("limma")
 BiocManager::install("pheatmap")
 BiocManager::install("org.Hs.eg.db")
-BiocManager::install("biomaRt") # local install package works.
+BiocManager::install("biomaRt") # installing the package in local works.
 remotes::install_github("jmzeng1314/GEOmirror")
 rm(list = ls())
 getwd()
@@ -54,8 +54,8 @@ disease_name <- "Sarcopenia"
 paste0(disease_name,": ", geoID)
 
 gset  <- getGEO(geoID, GSEMatrix =TRUE, getGPL=FALSE, destdir="./data/")
-# There is an alternative/quick option below if you want to download the data from China
-gset  <- geoChina(geoID, destdir="./data/") 
+## There is an alternative/quick option below if you want to download the data from China
+# gset  <- geoChina(geoID, destdir="./data/") 
 
 data     <- gset[[1]]
 exprSet  <- exprs(data)
@@ -158,10 +158,9 @@ save(exprSet,file = output_file)
 write.csv(exprSet, file = paste0(output_dir, geoID, "_norm_exprSet.csv"))
 ```
 
-## 3. Differential expressed genes
+## 3. Differentially expressed genes
 ```{r}
 # You may need to modify the scripts below accordingly to fit your requirements.
-
 View(metadata)
 
 if(geoID == "GSE62402"){

@@ -5,6 +5,7 @@ library(dplyr)
 library(RobustRankAggreg)
 ```
 
+## Import datasets
 ```{r}
 getwd()
 setwd("/Path/to/osteoporosis_sarcopenia_analysis/")
@@ -21,7 +22,7 @@ GSE136344_degs_list <- read.csv(file="./output_degs/Sarcopenia_GSE136344/GSE1363
 GSE1428_degs_list   <- read.csv(file="./output_degs/Sarcopenia_GSE1428/GSE1428_all_diff.csv")
 ```
 
-## Using RRA to intergrate gene lists. We treat OS and SA seperately.
+## Using RRA to intergrate one consistent gene list for each disease. We treat OS and SA seperately.
 ```{r}
 os_glist <- list(gene_set1=GSE56814_degs_list$X,
                  gene_set2=GSE56815_degs_list$X,
@@ -34,12 +35,12 @@ sa_glist <- list(gene_set1=GSE136344_degs_list$X,
 
 ```
 
+## Annotate w/ the freq. for each gene and output RRA results 
 ```{r}
-#RRA genes and annotate w/ the freq. of each gene
 os_freq    <- as.data.frame(table(unlist(os_glist)))
 os_ag      <- aggregateRanks(os_glist)
-os_ag$Freq <- os_freq[match(os_ag$Name,os_freq$Var1),2]
-os_ag_significant <- os_ag[which(os_ag$Score <= 0.05),]
+os_ag$Freq <- os_freq[match(os_ag$Name,os_freq$Var1), 2]
+os_ag_significant <- os_ag[which(os_ag$Score <= 0.05), ]
 
 output_file <- paste0("./output_degs/RRA_results/RRA_list_for_os.csv")
 write.csv(os_ag_significant, output_file)
@@ -54,7 +55,7 @@ output_file <- paste0("./output_degs/RRA_results/RRA_list_for_sa.csv")
 write.csv(sa_ag_significant, output_file)
 ```
 
-### intersection of RRA OS and SA
+### Intersection of RRA results for OS and SA
 ```{r}
 intersection_list <- inner_join(os_ag_significant, sa_ag_significant, by = "Name")
 output_file       <- paste0("./output_degs/RRA_results/RRA_list_intersection_os_sa.csv")
